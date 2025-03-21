@@ -2,24 +2,34 @@
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
     </IfModule>
+	
+	DirectoryIndex index.html index.php
 
     RewriteEngine On
 
-    # Handle Authorization Header
+    # Manejar encabezados de autorización y seguridad
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Handle X-XSRF-Token Header
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Redirect Trailing Slashes If Not A Folder...
+    # Redirigir si hay una barra al final, pero no es un directorio
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Front Controller...
+    # *** Asegurar que Laravel maneje sus rutas ***
+    RewriteCond %{REQUEST_URI} ^/(api|login|register|password|user|dashboard|admin|profile|logout|sanctum|storage|forgot-password|livewire|reset-password)/.*$ [OR]
+    RewriteCond %{REQUEST_URI} ^/(login|register|password|user|dashboard|admin|profile|logout|sanctum|storage|forgot-password|two-factor-challenge|up)$
+    RewriteRule ^ index.php [L]
+
+    # *** Servir archivos estáticos de Angular si existen ***
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # *** Si no es API ni ruta de Laravel, enviar a Angular ***
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^ index.php [L]
+    RewriteRule ^ /index.html [L]
 </IfModule>

@@ -2,6 +2,8 @@
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
     </IfModule>
+	
+	DirectoryIndex index.html index.php
 
     RewriteEngine On
 
@@ -17,18 +19,17 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # **Servir archivos estáticos de Angular si existen**
+    # *** Asegurar que Laravel maneje sus rutas ***
+    RewriteCond %{REQUEST_URI} ^/(api|login|register|password|user|dashboard|admin|profile|logout|sanctum|storage|forgot-password|livewire|reset-password)/.*$ [OR]
+    RewriteCond %{REQUEST_URI} ^/(login|register|password|user|dashboard|admin|profile|logout|sanctum|storage|forgot-password|two-factor-challenge|up)$
+    RewriteRule ^ index.php [L]
+
+    # *** Servir archivos estáticos de Angular si existen ***
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 
-    # **Redirigir todo lo que no sea un archivo o directorio real a Angular**
+    # *** Si no es API ni ruta de Laravel, enviar a Angular ***
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^(.*)$ /index.html [L]
-
-    # **Si no es manejado por Angular, pasar a Laravel**
-    RewriteCond %{REQUEST_URI} !^/api/.*$  # Excluir rutas API de Laravel
-    RewriteCond %{REQUEST_URI} !^/storage/.*$ # Excluir archivos de storage
-    RewriteCond %{REQUEST_URI} !^/public/.*$ # Excluir archivos públicos
-    RewriteRule ^ index.php [L]
+    RewriteRule ^ /index.html [L]
 </IfModule>

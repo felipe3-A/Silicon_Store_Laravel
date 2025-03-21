@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PosItem;
+use Illuminate\Support\Facades\DB;
 
 class PosItemController extends Controller
 {
@@ -22,7 +23,7 @@ class PosItemController extends Controller
 
 
 
-        // Obtener un solo item por ID
+    // Obtener un solo item por ID
     public function show($id)
     {
         $item = PosItem::find($id);
@@ -33,8 +34,37 @@ class PosItemController extends Controller
 
         return response()->json($item, 200);
     }
+    public function attributes()
+    {
 
-//     // Crear un nuevo item
+        return response()->json(DB::table('ospos_attribute_definitions')
+            ->where('deleted', 0)
+            ->get(), 200);
+    }
+    public function attributesValues($id)
+    {
+
+        $results = DB::table('ospos_attribute_links AS il')
+            ->join('ospos_attribute_definitions AS d', 'd.definition_id', '=', 'il.definition_id')
+            ->join('ospos_attribute_values AS v', 'v.attribute_id', '=', 'il.attribute_id')
+            ->select(
+                'il.definition_id',
+                'd.definition_name',
+                'il.definition_id',
+                'v.attribute_value'
+            )
+            ->whereNull('il.item_id')
+            ->whereNull('il.receiving_id')
+            ->whereNull('il.sale_id')
+            ->where('d.deleted', 0)
+            ->where('il.definition_id', $id)
+            ->get();
+        return response()->json($results, 200);
+    }
+
+
+
+    //     // Crear un nuevo item
 //     public function store(Request $request)
 // {
 //     try {
@@ -46,21 +76,21 @@ class PosItemController extends Controller
 //             'unit_price' => 'required|numeric',
 //         ]);
 
-//         // Crear el nuevo item
+    //         // Crear el nuevo item
 //         $item = PosItem::create($validatedData);
 
-//         return response()->json([
+    //         return response()->json([
 //             'message' => 'Artículo creado exitosamente',
 //             'data' => $item
 //         ], 201);
 
-//     } catch (\Illuminate\Validation\ValidationException $e) {
+    //     } catch (\Illuminate\Validation\ValidationException $e) {
 //         return response()->json([
 //             'message' => 'Error de validación',
 //             'errors' => $e->errors()
 //         ], 422);
 
-//     } catch (\Exception $e) {
+    //     } catch (\Exception $e) {
 //         return response()->json([
 //             'message' => 'Ocurrió un error al crear el artículo',
 //             'error' => $e->getMessage()

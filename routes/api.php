@@ -7,14 +7,17 @@ use App\Http\Controllers\ModuloController;
 use App\Http\Controllers\ModuloXPerfilController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\CartController;
-
+/*
 Route::get('/items', [PosItemController::class, 'index']); // Obtener todos los items
 Route::get('/items/{id}', [PosItemController::class, 'show']); // Obtener un item por ID
 Route::post('/items', [PosItemController::class, 'store']); // Crear un item
 Route::put('/items/{id}', [PosItemController::class, 'update']); // Actualizar un item
 Route::delete('/items/{id}', [PosItemController::class, 'destroy']); // Eliminar un item
+*/
+Route::apiResource('items', PosItemController::class);
 
-
+Route::get('/attributes', [PosItemController::class, 'attributes']);
+Route::get('/attributes/{id}', [PosItemController::class, 'attributesValues']);
 
 //Rutas para crear Modulos
 Route::post('/modulos', [ModuloController::class, 'store']);

@@ -64,35 +64,42 @@ class OsposCustomerController extends Controller
 
             // Crear la persona
             $person = OsposPerson::create([
-                'first_name' => $validatedData['first_name'],
-                'last_name' => $validatedData['last_name'],
-                'email' => $validatedData['email'],
+                'first_name' =>   mb_strtoupper(trim($validatedData['first_name'])),
+                'last_name' => mb_strtoupper(trim($validatedData['last_name'])),
+                'email' => mb_strtolower(trim($validatedData['email'])),
                 'phone_number' => $validatedData['phone_number'],
-                'address_1' => $validatedData['address_1'],
-                'city' => $validatedData['city'],
-                'state' => $validatedData['state'],
+                'address_1' => mb_strtolower(trim($validatedData['address_1'])),
+                'city' => mb_strtolower(trim($validatedData['city'])),
+                'state' => mb_strtolower(trim($validatedData['state'])),
                 'zip' => $validatedData['zip'],
-                'country' => $validatedData['country'],
+                'country' => mb_strtolower(trim($validatedData['country'])),
                 'comments' => $validatedData['comments'] ?? null,
             ]);
+
+
+
 
             // Crear el cliente
             $customer = OsposCustomer::create([
                 'person_id' => $person->person_id,
                 'account_number' => $validatedData['account_number'],
-                'company_name' => $validatedData['company_name'] ?? null,
+                'company_name' => mb_strtoupper(trim($validatedData['company_name'])) ?? null,
                 'discount' => $validatedData['discount'],
                 'discount_type' => $validatedData['discount_type'],
                 'package_id' => $validatedData['package_id'] ?? null,
                 'points' => $validatedData['points'] ?? 0,
                 'taxable' => 1,
+                'employee_id' => Auth::id() ?? 1, // 👈 Aquí puedes usar el usuario actual o uno fijo
+
                 'deleted' => 0,
             ]);
 
+
             // Crear el usuario
+
             $user = new User();
-            $user->name = $validatedData['first_name'] . ' ' . $validatedData['last_name'];
-            $user->email = $validatedData['email'];
+            $user->name = mb_strtoupper(trim($validatedData['first_name'] . ' ' . $validatedData['last_name']));
+            $user->email = mb_strtolower(trim($validatedData['email']));
             $user->password = Hash::make($validatedData['password']);
             $user->person_id = $person->person_id; // 🔥 Asegurar que el usuario tenga relación con la persona
             $user->save();

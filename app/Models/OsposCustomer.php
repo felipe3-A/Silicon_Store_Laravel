@@ -21,6 +21,7 @@ class OsposCustomer extends Model
 
     // Definir qué campos son asignables masivamente
     protected $fillable = [
+        'person_id',
         'company_name',
         'account_number',
         'taxable',

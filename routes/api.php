@@ -57,7 +57,6 @@ Route::post('/login', [Login::class, 'login']);
 Route::post('/logout', [Login::class, 'logout'])->middleware('auth:sanctum');
 Route::middleware('auth:sanctum')->get('/users', [Login::class, 'listUsers']);
 
-Route::apiResource('people', OsposPersonController::class);
 
 
 Route::prefix('customers')->group(function() {

@@ -1,9 +1,13 @@
 <IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
+
+    <IfModule mod_headers.c>
+        # Asegurar el tipo MIME correcto para archivos JavaScript
+        <FilesMatch "\.(js)$">
+            Header set Content-Type "application/javascript"
+        </FilesMatch>
     </IfModule>
-	
-	DirectoryIndex index.html index.php
+
+    DirectoryIndex index.html index.php
 
     RewriteEngine On
 
@@ -32,4 +36,5 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ /index.html [L]
+
 </IfModule>

@@ -26,17 +26,28 @@ class CartController extends Controller
         // Obtener el producto
         $item = PosItem::findOrFail($request->item_id);
 
-        // Agregar el item al carrito o actualizar la cantidad si ya existe
-        $cartItem = StoreCartItem::updateOrCreate(
-            ['cart_id' => $cart->id, 'item_id' => $item->item_id],
-            [
-                'quantity' => \DB::raw("quantity + " . ($request->quantity ?? 1)),
-                'subtotal' => \DB::raw("subtotal + " . ($item->unit_price * ($request->quantity ?? 1)))
-            ]
-        );
+        // Verificar si el item ya está en el carrito
+        $cartItem = StoreCartItem::where('cart_id', $cart->id)
+                    ->where('item_id', $item->item_id)
+                    ->first();
+
+        if ($cartItem) {
+            // Si el item ya existe, solo sumamos la cantidad y actualizamos el subtotal
+            $cartItem->increment('quantity', $request->quantity ?? 1);
+            $cartItem->increment('subtotal', $item->unit_price * ($request->quantity ?? 1));
+        } else {
+            // Si no existe, lo creamos
+            $cartItem = StoreCartItem::create([
+                'cart_id' => $cart->id,
+                'item_id' => $item->item_id,
+                'quantity' => $request->quantity ?? 1,
+                'subtotal' => $item->unit_price * ($request->quantity ?? 1),
+            ]);
+        }
 
         return response()->json(['message' => 'Item added to cart', 'cartItem' => $cartItem], 201);
     }
+
 
 
     public function createCart(Request $request) {
@@ -74,4 +85,64 @@ class CartController extends Controller
 
         return response()->json(['message' => 'Item removed successfully']);
     }
+
+    public function cartItems($person_id) {
+        $cart = StoreShoppingCart::where('person_id', $person_id)->first();
+
+        if (!$cart) {
+            return response()->json(['message' => 'Cart not found'], 404);
+        }
+
+        $items = StoreCartItem::where('cart_id', $cart->id)->with('product')->get();
+
+        return response()->json($items);
+    }
+
+    public function clearCart($person_id) {
+        $cart = StoreShoppingCart::where('person_id', $person_id)->first();
+
+        if (!$cart) {
+            return response()->json(['message' => 'Cart not found'], 404);
+        }
+
+        StoreCartItem::where('cart_id', $cart->id)->delete();
+
+        return response()->json(['message' => 'Cart cleared successfully']);
+    }
+
+    public function allCarts() {
+        $carts = StoreShoppingCart::with('items')->get();
+        return response()->json($carts);
+    }
+
+    public function obtenerCarrito($usuarioId)
+{
+    $carrito = StoreShoppingCart::where('person_id', $usuarioId)->first();
+
+    if (!$carrito) {
+        return response()->json(['error' => 'Carrito no encontrado'], 404);
+    }
+
+    return response()->json(['data' => $carrito], 200);
+}
+
+public function validarCarrito($person_id)
+{
+    $carrito = StoreShoppingCart::where('person_id', $person_id)->first();
+
+    if (!$carrito) {
+        return response()->json([
+            'existe' => false,
+            'mensaje' => 'Carrito no encontrado'
+        ], 404);
+    }
+
+    return response()->json([
+        'existe' => true,
+        'mensaje' => 'Carrito encontrado',
+        'carrito' => $carrito
+    ], 200);
+}
+
+
 }

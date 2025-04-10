@@ -13,8 +13,8 @@ class PosItemController extends Controller
     {
         return response()->json(
             PosItem::with('stockQuantities.location') // Cargar relaciones
-                ->where('deleted', 0) // Aqui se filtran los items filtrados
-                ->paginate(20), // Solo se mostraran 10 elementos
+                ->where('deleted', 0)                // ✅ Solo items activos
+                ->paginate(20),                      // 20 elementos por página
             200
         );
     }
@@ -23,10 +23,11 @@ class PosItemController extends Controller
 
 
 
+
     // Obtener un solo item por ID
-    public function show($id)
+    public function show($item_id)
     {
-        $item = PosItem::find($id);
+        $item = PosItem::find($item_id);
 
         if (!$item) {
             return response()->json(['message' => 'Item no encontrado'], 404);

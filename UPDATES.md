@@ -180,3 +180,5 @@ Pide a los usuarios que hagan una de las siguientes acciones:
 También puedes incluir un parámetro único en los archivos estáticos (por ejemplo, `style.css?v=123`) para forzar la actualización automática.
 
 ---
+
+[README.md](./README.md)

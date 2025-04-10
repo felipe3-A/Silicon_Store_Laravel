@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Carrito;
 use App\Models\PosItem;
 use App\Models\StoreShoppingCart;
 use App\Models\StoreCartItem;
@@ -13,12 +14,15 @@ class CartController extends Controller
     /**
      * Agregar un item al carrito
      */
-    public function addItem(Request $request) {
+    public function addItem(Request $request)
+    {
         $request->validate([
             'person_id' => 'required|exists:ospos_people,person_id',
             'item_id' => 'required|exists:ospos_items,item_id',
             'quantity' => 'nullable|integer|min:1'
         ]);
+
+        $quantity = $request->quantity ?? 1;
 
         // Obtener o crear el carrito del usuario
         $cart = StoreShoppingCart::firstOrCreate(['person_id' => $request->person_id]);
@@ -26,28 +30,47 @@ class CartController extends Controller
         // Obtener el producto
         $item = PosItem::findOrFail($request->item_id);
 
+        // Verificar si hay unidades disponibles
+        if ($item->quantity < $quantity) {
+            return response()->json([
+                'message' => 'No hay suficientes unidades disponibles para agregar al carrito.'
+            ], 400); // Error 400 Bad Request
+        }
+
         // Verificar si el item ya está en el carrito
         $cartItem = StoreCartItem::where('cart_id', $cart->id)
-                    ->where('item_id', $item->item_id)
-                    ->first();
+            ->where('item_id', $item->item_id)
+            ->first();
 
         if ($cartItem) {
-            // Si el item ya existe, solo sumamos la cantidad y actualizamos el subtotal
-            $cartItem->increment('quantity', $request->quantity ?? 1);
-            $cartItem->increment('subtotal', $item->unit_price * ($request->quantity ?? 1));
+            $cartItem->increment('quantity', $quantity);
+            $cartItem->increment('subtotal', $item->unit_price * $quantity);
         } else {
-            // Si no existe, lo creamos
             $cartItem = StoreCartItem::create([
                 'cart_id' => $cart->id,
                 'item_id' => $item->item_id,
-                'quantity' => $request->quantity ?? 1,
-                'subtotal' => $item->unit_price * ($request->quantity ?? 1),
+                'quantity' => $quantity,
+                'subtotal' => $item->unit_price * $quantity,
             ]);
         }
 
-        return response()->json(['message' => 'Item added to cart', 'cartItem' => $cartItem], 201);
+        // Restar del inventario
+        $item->decrement('quantity', $quantity);
+
+        return response()->json([
+            'message' => 'Producto agregado correctamente al carrito.',
+            'cartItem' => $cartItem
+        ], 201);
     }
 
+    public function verificarCarrito($person_id)
+    {
+        $existe = Carrito::where('person_id', $person_id)->exists();
+
+        return response()->json([
+            'existe' => $existe
+        ]);
+    }
 
 
     public function createCart(Request $request) {
@@ -79,12 +102,63 @@ class CartController extends Controller
     /**
      * Eliminar un item del carrito
      */
-    public function removeItem($cart_item_id) {
+    public function removeItem($cart_item_id)
+    {
         $cartItem = StoreCartItem::findOrFail($cart_item_id);
+
+        // Restaurar la cantidad al inventario
+        $item = PosItem::find($cartItem->item_id);
+        if ($item) {
+            $item->increment('quantity', $cartItem->quantity);
+        }
+
         $cartItem->delete();
 
-        return response()->json(['message' => 'Item removed successfully']);
+        return response()->json(['message' => 'Producto eliminado del carrito y stock restaurado.']);
     }
+
+    public function updateItemQuantity(Request $request, $cart_item_id)
+{
+    $request->validate([
+        'quantity' => 'required|integer|min:1'
+    ]);
+
+    $cartItem = StoreCartItem::findOrFail($cart_item_id);
+    $item = PosItem::findOrFail($cartItem->item_id);
+
+    $nuevaCantidad = $request->quantity;
+    $cantidadActual = $cartItem->quantity;
+    $diferencia = $nuevaCantidad - $cantidadActual;
+
+    // Si está aumentando la cantidad
+    if ($diferencia > 0) {
+        if ($item->quantity < $diferencia) {
+            return response()->json([
+                'message' => 'No hay suficiente stock disponible para aumentar la cantidad.'
+            ], 400);
+        }
+
+        // Restamos del inventario
+        $item->decrement('quantity', $diferencia);
+    }
+    // Si está reduciendo la cantidad
+    elseif ($diferencia < 0) {
+        // Devolvemos al inventario
+        $item->increment('quantity', abs($diferencia));
+    }
+
+    // Actualizamos la cantidad y subtotal
+    $cartItem->quantity = $nuevaCantidad;
+    $cartItem->subtotal = $item->unit_price * $nuevaCantidad;
+    $cartItem->save();
+
+    return response()->json([
+        'message' => 'Cantidad actualizada correctamente.',
+        'cartItem' => $cartItem
+    ]);
+}
+
+
 
     public function cartItems($person_id) {
         $cart = StoreShoppingCart::where('person_id', $person_id)->first();

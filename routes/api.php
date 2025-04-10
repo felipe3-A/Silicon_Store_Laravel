@@ -51,6 +51,8 @@ Route::prefix('cart')->group(function () {
     Route::get('/validar/{person_id}', [CartController::class, 'validarCarrito']);
 });
 
+Route::put('/cart/item/{id}/quantity', [CartController::class, 'updateItemQuantity']);
+
 // Autenticación
 Route::post('/register', [Login::class, 'register']);
 Route::post('/login', [Login::class, 'login']);
@@ -68,3 +70,5 @@ Route::prefix('customers')->group(function() {
     Route::put('{id}', [OsposCustomerController::class, 'update']); // Actualizar un cliente
     Route::delete('{id}', [OsposCustomerController::class, 'destroy']); // Eliminar un cliente
 });
+
+Route::get('/carrito/existe/{person_id}', [CartController::class, 'verificarCarrito']);

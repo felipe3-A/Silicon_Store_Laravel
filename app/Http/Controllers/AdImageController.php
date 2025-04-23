@@ -30,27 +30,54 @@ class AdImageController extends Controller
     // Subir una nueva imagen
     public function store(Request $request)
     {
-        $request->validate([
+        \Log::info('Método store alcanzado');
+
+        // Log del contenido del request
+        \Log::debug('Contenido del request', $request->all());
+
+        // Validación
+        $validator = Validator::make($request->all(), [
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             'description' => 'nullable|string'
         ]);
 
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('images', 'public');
-
-            $adImage = AdImage::create([
-                'image_url' => $path,
-                'description' => $request->input('description')
-            ]);
-
-            return response()->json([
-                'message' => 'Imagen subida con éxito',
-                'image' => $adImage
-            ]);
+        if ($validator->fails()) {
+            \Log::warning('Fallo la validación', ['errors' => $validator->errors()]);
+            return response()->json(['error' => 'Error de validación', 'details' => $validator->errors()], 422);
         }
 
+        if ($request->hasFile('image')) {
+            \Log::info('Imagen recibida');
+
+            $imageFile = $request->file('image');
+            \Log::debug('Nombre original de la imagen:', ['original_name' => $imageFile->getClientOriginalName()]);
+
+            $path = $imageFile->store('images', 'public');
+            \Log::info('Ruta almacenada', ['path' => $path]);
+
+            try {
+                $adImage = AdImage::create([
+                    'image_url' => $path,
+                    'description' => $request->input('description')
+                ]);
+
+                \Log::info('Imagen creada en base de datos', ['id' => $adImage->id]);
+
+                return response()->json([
+                    'message' => 'Imagen subida con éxito',
+                    'image' => $adImage
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Error al guardar la imagen en la base de datos', ['exception' => $e->getMessage()]);
+                return response()->json(['error' => 'Error al guardar en la base de datos'], 500);
+            }
+        }
+
+        \Log::warning('No se recibió ninguna imagen');
         return response()->json(['error' => 'No se pudo subir la imagen'], 400);
     }
+
+
 
     // Mostrar una imagen específica
     public function show($id)

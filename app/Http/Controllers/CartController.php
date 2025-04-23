@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
+use Illuminate\Support\Facades\Log;
+use App\Models\ItemQuantity; // Asumiendo que este es el modelo de ospos_item_quantities
 
 use App\Models\Carrito;
 use App\Models\PosItem;
@@ -16,52 +18,66 @@ class CartController extends Controller
      */
     public function addItem(Request $request)
     {
-        $request->validate([
-            'person_id' => 'required|exists:ospos_people,person_id',
-            'item_id' => 'required|exists:ospos_items,item_id',
-            'quantity' => 'nullable|integer|min:1'
-        ]);
-
-        $quantity = $request->quantity ?? 1;
-
-        // Obtener o crear el carrito del usuario
-        $cart = StoreShoppingCart::firstOrCreate(['person_id' => $request->person_id]);
-
-        // Obtener el producto
-        $item = PosItem::findOrFail($request->item_id);
-
-        // Verificar si hay unidades disponibles
-        if ($item->quantity < $quantity) {
-            return response()->json([
-                'message' => 'No hay suficientes unidades disponibles para agregar al carrito.'
-            ], 400); // Error 400 Bad Request
-        }
-
-        // Verificar si el item ya está en el carrito
-        $cartItem = StoreCartItem::where('cart_id', $cart->id)
-            ->where('item_id', $item->item_id)
-            ->first();
-
-        if ($cartItem) {
-            $cartItem->increment('quantity', $quantity);
-            $cartItem->increment('subtotal', $item->unit_price * $quantity);
-        } else {
-            $cartItem = StoreCartItem::create([
-                'cart_id' => $cart->id,
-                'item_id' => $item->item_id,
-                'quantity' => $quantity,
-                'subtotal' => $item->unit_price * $quantity,
+        try {
+            $request->validate([
+                'person_id' => 'required|exists:ospos_people,person_id',
+                'item_id' => 'required|exists:ospos_items,item_id',
+                'quantity' => 'nullable|integer|min:1'
             ]);
+
+            $quantity = $request->quantity ?? 1;
+
+            $cart = StoreShoppingCart::firstOrCreate(['person_id' => $request->person_id]);
+
+            $item = PosItem::findOrFail($request->item_id);
+
+            $locationId = 1;
+            $stock = ItemQuantity::where('item_id', $item->item_id)
+                                 ->where('location_id', $locationId)
+                                 ->first();
+
+            if (!$stock || $stock->quantity < $quantity) {
+                Log::info("Stock insuficiente para item_id {$item->item_id} en location_id $locationId. Cantidad encontrada: " . ($stock->quantity ?? 0));
+                return response()->json([
+                    'message' => 'No hay suficientes unidades disponibles en esta ubicación.'
+                ], 400);
+            }
+
+            Log::info("Stock disponible para item_id {$item->item_id} en location_id $locationId: {$stock->quantity}");
+
+            $cartItem = StoreCartItem::where('cart_id', $cart->id)
+                ->where('item_id', $item->item_id)
+                ->first();
+
+            if ($cartItem) {
+                $cartItem->increment('quantity', $quantity);
+                $cartItem->increment('subtotal', $item->unit_price * $quantity);
+            } else {
+                $cartItem = StoreCartItem::create([
+                    'cart_id' => $cart->id, // corregido aquí
+                    'item_id' => $item->item_id,
+                    'quantity' => $quantity,
+                    'subtotal' => $item->unit_price * $quantity,
+                ]);
+            }
+
+            ItemQuantity::where('item_id', $item->item_id)
+            ->where('location_id', $locationId)
+            ->update(['quantity' => \DB::raw("quantity - $quantity")]);
+
+            return response()->json([
+                'message' => 'Producto agregado correctamente al carrito.',
+                'cartItem' => $cartItem
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error("Error al agregar producto al carrito: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Error interno al agregar el producto al carrito.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Restar del inventario
-        $item->decrement('quantity', $quantity);
-
-        return response()->json([
-            'message' => 'Producto agregado correctamente al carrito.',
-            'cartItem' => $cartItem
-        ], 201);
     }
+
 
     public function verificarCarrito($person_id)
     {
@@ -102,20 +118,45 @@ class CartController extends Controller
     /**
      * Eliminar un item del carrito
      */
-    public function removeItem($cart_item_id)
+    public function removeItem($person_id, $item_id)
     {
-        $cartItem = StoreCartItem::findOrFail($cart_item_id);
+        Log::info("Intentando eliminar item con ID {$item_id} del carrito del usuario con ID {$person_id}");
 
-        // Restaurar la cantidad al inventario
-        $item = PosItem::find($cartItem->item_id);
-        if ($item) {
-            $item->increment('quantity', $cartItem->quantity);
+        try {
+            $cart = StoreShoppingCart::where('person_id', $person_id)->first();
+
+            if (!$cart) {
+                Log::warning("Carrito para el usuario con ID {$person_id} no encontrado.");
+                return response()->json(['message' => 'Carrito no encontrado.'], 404);
+            }
+
+            // Verificar si el carrito tiene la relación 'items'
+            if (!method_exists($cart, 'items')) {
+                Log::error("La relación 'items' no está definida en el modelo StoreShoppingCart.");
+                return response()->json(['message' => 'Error interno en la relación del modelo.'], 500);
+            }
+
+            // Buscar el ítem dentro del carrito
+            $item = $cart->items()->where('id', $item_id)->first();
+
+            if (!$item) {
+                Log::warning("Item con ID {$item_id} no encontrado en el carrito del usuario con ID {$person_id}.");
+                return response()->json(['message' => 'Item no encontrado en este carrito.'], 404);
+            }
+
+            $item->delete();
+            Log::info("Item con ID {$item_id} eliminado correctamente del carrito del usuario con ID {$person_id}.");
+
+            return response()->json(['message' => 'Item eliminado correctamente.']);
+
+        } catch (\Exception $e) {
+            Log::error("Error al eliminar el item: " . $e->getMessage());
+            return response()->json(['message' => 'Ocurrió un error al eliminar el item.'], 500);
         }
-
-        $cartItem->delete();
-
-        return response()->json(['message' => 'Producto eliminado del carrito y stock restaurado.']);
     }
+
+
+
 
     public function updateItemQuantity(Request $request, $cart_item_id)
 {

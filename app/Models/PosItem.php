@@ -47,6 +47,14 @@ class PosItem extends Model
     }
 
     public function cartItems() {
-        return $this->hasMany(StoreCartItem::class, 'item_id');
+        return $this->hasMany(StoreCartItem::class, 'item_id', 'item_id');
     }
+    // En el modelo PosItem
+
+public function stockLocations()
+{
+    return $this->belongsToMany(StockLocation::class, 'stock_item_location', 'item_id', 'location_id')
+                ->withPivot('quantity');
+}
+
 }

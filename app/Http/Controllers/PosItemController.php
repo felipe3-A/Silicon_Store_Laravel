@@ -11,30 +11,60 @@ class PosItemController extends Controller
     // Obtener todos los items
     public function index()
     {
-        return response()->json(
-            PosItem::with('stockQuantities.location') // Cargar relaciones
-                ->where('deleted', 0)                // ✅ Solo items activos
-                ->paginate(20),                      // 20 elementos por página
-            200
-        );
+        $items = PosItem::with([
+            'stockQuantities' => function ($query) {
+                $query->where('quantity', '>', 0)
+                    ->whereHas('location', function ($q) {
+                        $q->where('deleted', 0);
+                    });
+            },
+            'stockQuantities.location'
+        ])
+            ->where('deleted', 0)
+            ->get()
+            ->map(function ($item) {
+                $totalQuantity = $item->stockQuantities->sum('quantity');
+                $item->total_quantity = $totalQuantity; // Añade el campo total_quantity al item
+                return $item;
+            });
+
+        return response()->json($items, 200);
     }
 
+    //LISTAR UN ITEM SOLAMNETE
 
-
-
-
-
-    // Obtener un solo item por ID
     public function show($item_id)
     {
-        $item = PosItem::find($item_id);
+        $item = PosItem::with([
+            'stockQuantities' => function ($query) {
+                $query->where('quantity', '>', 0)
+                    ->whereHas('location', function ($q) {
+                        $q->where('deleted', 0);
+                    });
+            },
+            'stockQuantities.location'
+        ])
+            ->where('deleted', 0)
+            ->find($item_id);
 
         if (!$item) {
             return response()->json(['message' => 'Item no encontrado'], 404);
         }
 
+        $totalQuantity = $item->stockQuantities->sum('quantity');
+        $item->total_quantity = $totalQuantity;
+
+        if ($totalQuantity <= 0) {
+            return response()->json([
+                'message' => 'Este producto no tiene unidades disponibles',
+                'item' => $item
+            ], 200);
+        }
+
         return response()->json($item, 200);
     }
+    // Obtener un solo item por ID
+
     public function attributes()
     {
 
@@ -65,41 +95,6 @@ class PosItemController extends Controller
 
 
 
-    //     // Crear un nuevo item
-//     public function store(Request $request)
-// {
-//     try {
-//         // Validación de datos
-//         $validatedData = $request->validate([
-//             'name' => 'required|string|max:255',
-//             'category' => 'required|string|max:255',
-//             'cost_price' => 'required|numeric',
-//             'unit_price' => 'required|numeric',
-//         ]);
-
-    //         // Crear el nuevo item
-//         $item = PosItem::create($validatedData);
-
-    //         return response()->json([
-//             'message' => 'Artículo creado exitosamente',
-//             'data' => $item
-//         ], 201);
-
-    //     } catch (\Illuminate\Validation\ValidationException $e) {
-//         return response()->json([
-//             'message' => 'Error de validación',
-//             'errors' => $e->errors()
-//         ], 422);
-
-    //     } catch (\Exception $e) {
-//         return response()->json([
-//             'message' => 'Ocurrió un error al crear el artículo',
-//             'error' => $e->getMessage()
-//         ], 500);
-//     }
-// }
-
-
     // Actualizar un item
     public function update(Request $request, $id)
     {
@@ -127,4 +122,57 @@ class PosItemController extends Controller
 
         return response()->json(['message' => 'Item eliminado correctamente'], 200);
     }
+
+    public function categoriesWithItems()
+    {
+        // Agrupar productos por categoría, considerando solo productos no eliminados y con stock
+        $categories = PosItem::with(['stockQuantities' => function ($query) {
+                $query->where('quantity', '>', 0)
+                      ->whereHas('location', function ($q) {
+                          $q->where('deleted', 0);
+                      });
+            }])
+            ->where('deleted', 0)
+            ->get()
+            ->filter(function ($item) {
+                return $item->stockQuantities->sum('quantity') > 0;
+            })
+            ->groupBy('category')
+            ->map(function ($items, $category) {
+                return [
+                    'category' => $category,
+                    'items' => $items->map(function ($item) {
+                        $item->total_quantity = $item->stockQuantities->sum('quantity');
+                        return $item;
+                    })->values()
+                ];
+            })
+            ->values(); // Re-indexa el array de categorías
+
+        return response()->json($categories, 200);
+    }
+    public function getItemsByCategory($category)
+    {
+        $items = PosItem::with(['stockQuantities' => function ($query) {
+                $query->where('quantity', '>', 0)
+                      ->whereHas('location', function ($q) {
+                          $q->where('deleted', 0);
+                      });
+            }])
+            ->where('category', $category)
+            ->where('deleted', 0)
+            ->get()
+            ->filter(function ($item) {
+                return $item->stockQuantities->sum('quantity') > 0;
+            })
+            ->map(function ($item) {
+                $item->total_quantity = $item->stockQuantities->sum('quantity');
+                return $item;
+            })
+            ->values();
+
+        return response()->json($items, 200);
+    }
+
+
 }

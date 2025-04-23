@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\StoreShoppingCart;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class Login extends Controller
 {
@@ -49,13 +50,12 @@ class Login extends Controller
     }
 
     /**
-     * Método para iniciar sesión.
+     * Método para iniciar sesión, se le hizo una modificacion para enviar correctamente el JWT
      */
+
     public function login(Request $request)
     {
         try {
-            \Log::info('Intentando iniciar sesión', $request->all());
-
             $request->validate([
                 'email' => 'required|email',
                 'password' => 'required',
@@ -65,20 +65,17 @@ class Login extends Controller
                 $user = Auth::user();
                 \Log::info('Usuario autenticado con éxito', ['user_id' => $user->id]);
 
-                $token = $user->createToken('authToken')->plainTextToken;
+                // Generación del token con JWTAuth
+                $token = JWTAuth::fromUser($user);
 
-                // Verificamos si ya tiene carrito
-                $existingCart = StoreShoppingCart::where('person_id', $user->id)->first();
-
-                if (!$existingCart) {
-                    // Si no tiene carrito, se le crea uno
-                    $cart = StoreShoppingCart::create(['person_id' => $user->id]);
-                    $cartMessage = '¡Bienvenido! Se te ha creado un carrito.';
-                    \Log::info($cartMessage, ['user_id' => $user->id]);
-                } else {
-                    $cartMessage = '¡Bienvenido! Te espera tu carrito.';
-                    \Log::info($cartMessage, ['user_id' => $user->id]);
+                // Validación de token
+                if (count(explode('.', $token)) !== 3) {
+                    \Log::error('El token no es un JWT válido', ['token' => $token]);
+                    return response()->json(['message' => 'Token inválido'], 500);
                 }
+
+                $existingCart = StoreShoppingCart::where('person_id', $user->id)->first();
+                $cartMessage = $existingCart ? '¡Bienvenido! Te espera tu carrito.' : '¡Bienvenido! Se te ha creado un carrito.';
 
                 return response()->json([
                     'message' => 'Inicio de sesión exitoso',
@@ -88,13 +85,14 @@ class Login extends Controller
                 ], 200);
             }
 
-            \Log::warning('Intento de inicio de sesión fallido: credenciales incorrectas');
             return response()->json(['message' => 'Credenciales incorrectas'], 401);
         } catch (\Exception $e) {
             \Log::error('Error durante el inicio de sesión', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'Error en el inicio de sesión', 'error' => $e->getMessage()], 500);
         }
     }
+
+
 
 
     public function listUsers()
@@ -117,42 +115,39 @@ class Login extends Controller
      * Método para cerrar sesión.
      */
     public function logout(Request $request)
-{
-    try {
-        $user = $request->user();
+    {
+        try {
+            // Obtener el token desde el header
+            $token = JWTAuth::getToken();
 
-        if (!$user) {
-            \Log::warning('Intento de cerrar sesión sin usuario autenticado', [
-                'headers' => $request->headers->all(),
-                'ip' => $request->ip()
-            ]);
+            if (!$token) {
+                return response()->json([
+                    'message' => 'Token no proporcionado'
+                ], 400);
+            }
+
+            // Invalidar el token actual
+            JWTAuth::invalidate($token);
+
+            \Log::info('Token JWT invalidado correctamente');
 
             return response()->json([
-                'message' => 'No se encontró un usuario autenticado.'
+                'message' => 'Sesión cerrada correctamente'
+            ]);
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            \Log::error('Token inválido al cerrar sesión', ['error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'El token ya es inválido o expiró',
+                'error' => $e->getMessage()
             ], 401);
+        } catch (\Exception $e) {
+            \Log::error('Error al cerrar sesión', ['error' => $e->getMessage()]);
+            return response()->json([
+                'message' => 'Error al cerrar sesión',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Borra todos los tokens del usuario (revoca sesión)
-        $user->tokens()->delete();
-
-        \Log::info('Usuario cerró sesión exitosamente', ['user_id' => $user->id]);
-
-        return response()->json([
-            'message' => 'Sesión cerrada correctamente'
-        ]);
-    } catch (\Throwable $e) {
-        \Log::error('Error al cerrar sesión', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'ip' => $request->ip(),
-            'headers' => $request->headers->all()
-        ]);
-
-        return response()->json([
-            'message' => 'Error al cerrar sesión',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
+
 
 }

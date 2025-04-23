@@ -17,4 +17,6 @@ class StoreShoppingCart extends Model {
     public function items() {
         return $this->hasMany(StoreCartItem::class, 'cart_id');
     }
+
+ 
 }

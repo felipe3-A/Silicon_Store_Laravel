@@ -14,8 +14,10 @@ class StoreCartItem extends Model {
         return $this->belongsTo(StoreShoppingCart::class, 'cart_id');
     }
 
-    public function product() {
+    public function product()
+    {
         return $this->belongsTo(PosItem::class, 'item_id');
     }
+
 }
 

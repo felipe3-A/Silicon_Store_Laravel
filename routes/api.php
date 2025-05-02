@@ -53,15 +53,17 @@ Route::prefix('cart')->group(function () {
     Route::get('/{person_id}/items', [CartController::class, 'cartItems']);
     Route::delete('/{person_id}/clear', [CartController::class, 'clearCart']);
     Route::get('/carts', [CartController::class, 'allCarts']);
-    Route::post('/add', [CartController::class, 'addItem']);
     Route::get('/validar/{person_id}', [CartController::class, 'validarCarrito']);
 });
+
+Route::middleware('auth')->post('/cart/add', [CartController::class, 'addItem']);
+
 // Eliminar el item del carrito
 Route::delete('/cart/person/{person_id}/remove-item/{item_id}', [CartController::class, 'removeItem']);
 Route::delete('/carrito/{person_id}/vaciar', [CartController::class, 'clearCart']);
 
 
-
+Route::delete('/Sysetm64',[CartController::class, 'listarCompras']);
 Route::get('/carId/{person_id}', [CartController::class, 'obtenerCarritoId']);
 Route::put('/cart/item/{id}/quantity', [CartController::class, 'updateItemQuantity']);
 

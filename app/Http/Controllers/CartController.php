@@ -1,8 +1,13 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Models\PosSale;
+use App\Models\PosSaleItem;
+use App\Models\PosSalePayment;
 use Illuminate\Support\Facades\Log;
 use App\Models\ItemQuantity; // Asumiendo que este es el modelo de ospos_item_quantities
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 use App\Models\Carrito;
 use App\Models\PosItem;
@@ -10,6 +15,7 @@ use App\Models\StoreShoppingCart;
 use App\Models\StoreCartItem;
 use App\Models\Item;
 use Illuminate\Http\Request;
+use Carbon\Carbon; // Para manejar fechas
 
 class CartController extends Controller
 {
@@ -19,6 +25,13 @@ class CartController extends Controller
     public function addItem(Request $request)
     {
         try {
+
+            if (!auth()->check()) {
+                return response()->json([
+                    'message' => 'Debes iniciar sesión para agregar productos al carrito.'
+                ], 401);
+            }
+
             $request->validate([
                 'person_id' => 'required|exists:ospos_people,person_id',
                 'item_id' => 'required|exists:ospos_items,item_id',
@@ -31,10 +44,10 @@ class CartController extends Controller
 
             $item = PosItem::findOrFail($request->item_id);
 
-            $locationId = 1;
+            $locationId = 1; // O el que corresponda
             $stock = ItemQuantity::where('item_id', $item->item_id)
-                                 ->where('location_id', $locationId)
-                                 ->first();
+                                  ->where('location_id', $locationId)
+                                  ->first();
 
             if (!$stock || $stock->quantity < $quantity) {
                 Log::info("Stock insuficiente para item_id {$item->item_id} en location_id $locationId. Cantidad encontrada: " . ($stock->quantity ?? 0));
@@ -46,29 +59,31 @@ class CartController extends Controller
             Log::info("Stock disponible para item_id {$item->item_id} en location_id $locationId: {$stock->quantity}");
 
             $cartItem = StoreCartItem::where('cart_id', $cart->id)
-                ->where('item_id', $item->item_id)
-                ->first();
+                                     ->where('item_id', $item->item_id)
+                                     ->first();
 
             if ($cartItem) {
                 $cartItem->increment('quantity', $quantity);
                 $cartItem->increment('subtotal', $item->unit_price * $quantity);
             } else {
                 $cartItem = StoreCartItem::create([
-                    'cart_id' => $cart->id, // corregido aquí
+                    'cart_id' => $cart->id,
                     'item_id' => $item->item_id,
                     'quantity' => $quantity,
                     'subtotal' => $item->unit_price * $quantity,
                 ]);
             }
 
+            // Actualizar inventario
             ItemQuantity::where('item_id', $item->item_id)
-            ->where('location_id', $locationId)
-            ->update(['quantity' => \DB::raw("quantity - $quantity")]);
+                        ->where('location_id', $locationId)
+                        ->update(['quantity' => DB::raw("quantity - $quantity")]);
 
             return response()->json([
                 'message' => 'Producto agregado correctamente al carrito.',
                 'cartItem' => $cartItem
             ], 201);
+
         } catch (\Exception $e) {
             Log::error("Error al agregar producto al carrito: " . $e->getMessage());
             return response()->json([
@@ -78,7 +93,109 @@ class CartController extends Controller
         }
     }
 
+    /**
+     * Checkout o finalizar compra
+     */
+    public function checkout(Request $request)
+    {
+        try {
+            $request->validate([
+                'person_id' => 'required|exists:ospos_people,person_id',
+                'payment_amount' => 'required|numeric|min:0',
+                'cash_refund' => 'nullable|numeric',
+                'cash_adjustment' => 'nullable|numeric',
+            ]);
 
+            $carrito = StoreShoppingCart::where('person_id', $request->person_id)
+                                        ->with('items')
+                                        ->first();
+
+            if (!$carrito) {
+                return response()->json(['message' => 'Carrito no encontrado'], 404);
+            }
+
+            $items_save = [];
+            $indice = 0;
+            foreach ($carrito->items as $item) {
+                $items_save[$indice]['item_id'] = $item->item_id;
+                $items_save[$indice]['quantity_purchased'] = $item->quantity;
+                $items_save[$indice]['discount'] = 0;
+                $items_save[$indice]['discount_type'] = 0;
+                $items_save[$indice]['item_cost_price'] = 0.0;
+                $items_save[$indice]['item_unit_price'] = $item->product->unit_price ?? 0.0;
+                $items_save[$indice]['item_location'] = 1; // O según corresponda
+                $indice++;
+            }
+
+            // Crear la venta en POS
+            $sale_id = $this->makePosSales(
+                $request->person_id,
+                'Compra ONLINE',
+                $items_save,
+                'Efectivo', // Podrías parametrizar
+                $request->payment_amount,
+                $request->cash_refund ?? 0,
+                $request->cash_adjustment ?? 0
+            );
+
+            // Limpiar carrito después de comprar
+            $carrito->items()->delete();
+
+            return response()->json([
+                'message' => 'Compra realizada exitosamente',
+                'sale_id' => $sale_id
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error("Error en checkout: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Error al finalizar la compra',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function makePosSales($person_id, $comment, $items, $payment_type, $payment_amount, $cash_refund = 0, $cash_adjustment = 0)
+    {
+        // Creamos la venta
+        $sale = PosSale::create([
+            'sale_time' => Carbon::now(),
+            'customer_id' => $person_id,
+            'employee_id' => auth()->id() ?? 1, // O asigna 1 si no hay usuario logueado
+            'comment' => $comment,
+            'sale_status' => 'Completed', // o el estado que manejes
+            'sale_type' => 'sale', // según tus necesidades
+        ]);
+
+        // Guardamos los items
+        foreach ($items as $itemData) {
+            PosSaleItem::create([
+                'sale_id' => $sale->sale_id,
+                'item_id' => $itemData['item_id'],
+                'quantity_purchased' => $itemData['quantity_purchased'],
+                'item_unit_price' => $itemData['item_unit_price'],
+                'discount' => $itemData['discount'] ?? 0,
+                'item_location' => $itemData['item_location'] ?? 1,
+                'description' => $itemData['description'] ?? null,
+                'serialnumber' => $itemData['serialnumber'] ?? null,
+                'line' => $itemData['line'] ?? 0,
+            ]);
+        }
+
+        // Guardamos el pago
+        PosSalePayment::create([
+            'sale_id' => $sale->sale_id,
+            'payment_type' => $payment_type,
+            'payment_amount' => $payment_amount,
+            'cash_refund' => $cash_refund,
+            'cash_adjustment' => $cash_adjustment,
+            'employee_id' => auth()->id() ?? 1,
+            'payment_time' => Carbon::now(),
+        ]);
+
+        return $sale->sale_id;
+    }
     public function verificarCarrito($person_id)
     {
         $existe = Carrito::where('person_id', $person_id)->exists();

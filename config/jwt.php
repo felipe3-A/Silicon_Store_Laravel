@@ -290,7 +290,7 @@ return [
         | Storage Provider
         |--------------------------------------------------------------------------
         |
-        | Specify the provider that is used to store tokens in the blacklist.
+        | Specify t the provider that is used to store tokens in the blacklist.
         |
         */
 

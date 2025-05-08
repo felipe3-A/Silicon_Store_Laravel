@@ -11,6 +11,7 @@ use App\Http\Controllers\{
     Login
 
 };
+
 use App\Http\Controllers\OsposCustomerController;
 use App\Http\Controllers\Api\DataInfoController;
 use App\Http\Controllers\Api\StoreItemGalleryController;
@@ -56,21 +57,22 @@ Route::prefix('cart')->group(function () {
     Route::get('/validar/{person_id}', [CartController::class, 'validarCarrito']);
 });
 
-Route::middleware('auth')->post('/cart/add', [CartController::class, 'addItem']);
+
+     Route::post('/cart/add', [CartController::class, 'addItem']);
+  Route::post('/cart/checkout', [CartController::class, 'checkout']);
+
 
 // Eliminar el item del carrito
 Route::delete('/cart/person/{person_id}/remove-item/{item_id}', [CartController::class, 'removeItem']);
 Route::delete('/carrito/{person_id}/vaciar', [CartController::class, 'clearCart']);
 
 
-Route::delete('/Sysetm64',[CartController::class, 'listarCompras']);
-Route::get('/carId/{person_id}', [CartController::class, 'obtenerCarritoId']);
 Route::put('/cart/item/{id}/quantity', [CartController::class, 'updateItemQuantity']);
 
 // Autenticación
 Route::post('/register', [Login::class, 'register']);
 Route::post('/login', [Login::class, 'login']);
-Route::post('/logout', [Login::class, 'logout'])->middleware('auth:sanctum');
+Route::post('/logout', [Login::class, 'logout']);
 Route::middleware('auth:sanctum')->get('/users', [Login::class, 'listUsers']);
 
 

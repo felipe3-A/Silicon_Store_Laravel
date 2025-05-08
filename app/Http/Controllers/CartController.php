@@ -1,70 +1,95 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
 use Illuminate\Support\Facades\Log;
-use App\Models\ItemQuantity; // Asumiendo que este es el modelo de ospos_item_quantities
+use App\Models\ItemQuantity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
+use Tymon\JWTAuth\Exceptions\TokenInvalidException;
 use App\Models\Carrito;
 use App\Models\PosItem;
 use App\Models\StoreShoppingCart;
 use App\Models\StoreCartItem;
 use App\Models\Item;
 use Illuminate\Http\Request;
-use Carbon\Carbon; // Para manejar fechas
+use Carbon\Carbon;
 
 class CartController extends Controller
 {
-    /**
-     * Agregar un item al carrito
-     */
-    public function addItem(Request $request)
+
+
+    protected function authenticateUser()
     {
         try {
+            $user = JWTAuth::parseToken()->authenticate();
 
-            if (!auth()->check()) {
-                return response()->json([
-                    'message' => 'Debes iniciar sesión para agregar productos al carrito.'
-                ], 401);
+            if (!$user) {
+                Log::warning('Autenticación fallida: token válido pero sin usuario asociado.');
+                return response()->json(['message' => 'No se pudo autenticar el usuario.'], 401);
             }
 
+            return $user;
+
+        } catch (TokenExpiredException $e) {
+            Log::info('Token expirado: ' . $e->getMessage());
+            return response()->json(['message' => 'El token ha expirado.'], 401);
+        } catch (TokenInvalidException $e) {
+            Log::info('Token inválido: ' . $e->getMessage());
+            return response()->json(['message' => 'Token inválido.'], 401);
+        } catch (\Exception $e) {
+            Log::error('Error general de autenticación: ' . $e->getMessage());
+            return response()->json(['message' => 'No se pudo autenticar el token.'], 401);
+        }
+    }
+
+    public function addItem(Request $request)
+    {
+        $authResult = $this->authenticateUser();
+        if ($authResult instanceof \Illuminate\Http\JsonResponse) {
+            return $authResult;
+        }
+
+        $user = $authResult;
+        $person_id = $user->person_id;
+
+        try {
             $request->validate([
-                'person_id' => 'required|exists:ospos_people,person_id',
                 'item_id' => 'required|exists:ospos_items,item_id',
                 'quantity' => 'nullable|integer|min:1'
             ]);
 
             $quantity = $request->quantity ?? 1;
 
-            $cart = StoreShoppingCart::firstOrCreate(['person_id' => $request->person_id]);
+            $cart = StoreShoppingCart::firstOrCreate(['person_id' => $person_id]);
 
             $item = PosItem::findOrFail($request->item_id);
 
-            $locationId = 1; // O el que corresponda
+            $locationId = 1;
             $stock = ItemQuantity::where('item_id', $item->item_id)
-                                  ->where('location_id', $locationId)
-                                  ->first();
+                ->where('location_id', $locationId)
+                ->first();
 
             if (!$stock || $stock->quantity < $quantity) {
-                Log::info("Stock insuficiente para item_id {$item->item_id} en location_id $locationId. Cantidad encontrada: " . ($stock->quantity ?? 0));
+                Log::info("Stock insuficiente para el item ID {$item->item_id} - solicitado: $quantity, disponible: " . (isset($stock->quantity) ? $stock->quantity : 0));
                 return response()->json([
                     'message' => 'No hay suficientes unidades disponibles en esta ubicación.'
                 ], 400);
             }
 
-            Log::info("Stock disponible para item_id {$item->item_id} en location_id $locationId: {$stock->quantity}");
-
             $cartItem = StoreCartItem::where('cart_id', $cart->id)
-                                     ->where('item_id', $item->item_id)
-                                     ->first();
+                ->where('item_id', $item->item_id)
+                ->first();
 
             if ($cartItem) {
                 $cartItem->increment('quantity', $quantity);
                 $cartItem->increment('subtotal', $item->unit_price * $quantity);
+                Log::info("Item {$item->item_id} incrementado en carrito ID {$cart->id} para usuario {$person_id}");
             } else {
                 $cartItem = StoreCartItem::create([
                     'cart_id' => $cart->id,
@@ -72,12 +97,12 @@ class CartController extends Controller
                     'quantity' => $quantity,
                     'subtotal' => $item->unit_price * $quantity,
                 ]);
+                Log::info("Item {$item->item_id} agregado al carrito ID {$cart->id} para usuario {$person_id}");
             }
 
-            // Actualizar inventario
             ItemQuantity::where('item_id', $item->item_id)
-                        ->where('location_id', $locationId)
-                        ->update(['quantity' => DB::raw("quantity - $quantity")]);
+                ->where('location_id', $locationId)
+                ->update(['quantity' => DB::raw("quantity - $quantity")]);
 
             return response()->json([
                 'message' => 'Producto agregado correctamente al carrito.',
@@ -93,6 +118,8 @@ class CartController extends Controller
         }
     }
 
+
+
     /**
      * Checkout o finalizar compra
      */
@@ -107,8 +134,8 @@ class CartController extends Controller
             ]);
 
             $carrito = StoreShoppingCart::where('person_id', $request->person_id)
-                                        ->with('items')
-                                        ->first();
+                ->with('items')
+                ->first();
 
             if (!$carrito) {
                 return response()->json(['message' => 'Carrito no encontrado'], 404);
@@ -206,7 +233,8 @@ class CartController extends Controller
     }
 
 
-    public function createCart(Request $request) {
+    public function createCart(Request $request)
+    {
         $request->validate([
             'person_id' => 'required|exists:ospos_people,person_id'
         ]);
@@ -220,7 +248,8 @@ class CartController extends Controller
     /**
      * Mostrar el carrito de un usuario
      */
-    public function showCart($person_id) {
+    public function showCart($person_id)
+    {
         $cart = StoreShoppingCart::where('person_id', $person_id)
             ->with(['items.product'])
             ->first();
@@ -276,49 +305,50 @@ class CartController extends Controller
 
 
     public function updateItemQuantity(Request $request, $cart_item_id)
-{
-    $request->validate([
-        'quantity' => 'required|integer|min:1'
-    ]);
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1'
+        ]);
 
-    $cartItem = StoreCartItem::findOrFail($cart_item_id);
-    $item = PosItem::findOrFail($cartItem->item_id);
+        $cartItem = StoreCartItem::findOrFail($cart_item_id);
+        $item = PosItem::findOrFail($cartItem->item_id);
 
-    $nuevaCantidad = $request->quantity;
-    $cantidadActual = $cartItem->quantity;
-    $diferencia = $nuevaCantidad - $cantidadActual;
+        $nuevaCantidad = $request->quantity;
+        $cantidadActual = $cartItem->quantity;
+        $diferencia = $nuevaCantidad - $cantidadActual;
 
-    // Si está aumentando la cantidad
-    if ($diferencia > 0) {
-        if ($item->quantity < $diferencia) {
-            return response()->json([
-                'message' => 'No hay suficiente stock disponible para aumentar la cantidad.'
-            ], 400);
+        // Si está aumentando la cantidad
+        if ($diferencia > 0) {
+            if ($item->quantity < $diferencia) {
+                return response()->json([
+                    'message' => 'No hay suficiente stock disponible para aumentar la cantidad.'
+                ], 400);
+            }
+
+            // Restamos del inventario
+            $item->decrement('quantity', $diferencia);
+        }
+        // Si está reduciendo la cantidad
+        elseif ($diferencia < 0) {
+            // Devolvemos al inventario
+            $item->increment('quantity', abs($diferencia));
         }
 
-        // Restamos del inventario
-        $item->decrement('quantity', $diferencia);
+        // Actualizamos la cantidad y subtotal
+        $cartItem->quantity = $nuevaCantidad;
+        $cartItem->subtotal = $item->unit_price * $nuevaCantidad;
+        $cartItem->save();
+
+        return response()->json([
+            'message' => 'Cantidad actualizada correctamente.',
+            'cartItem' => $cartItem
+        ]);
     }
-    // Si está reduciendo la cantidad
-    elseif ($diferencia < 0) {
-        // Devolvemos al inventario
-        $item->increment('quantity', abs($diferencia));
-    }
-
-    // Actualizamos la cantidad y subtotal
-    $cartItem->quantity = $nuevaCantidad;
-    $cartItem->subtotal = $item->unit_price * $nuevaCantidad;
-    $cartItem->save();
-
-    return response()->json([
-        'message' => 'Cantidad actualizada correctamente.',
-        'cartItem' => $cartItem
-    ]);
-}
 
 
 
-    public function cartItems($person_id) {
+    public function cartItems($person_id)
+    {
         $cart = StoreShoppingCart::where('person_id', $person_id)->first();
 
         if (!$cart) {
@@ -330,7 +360,8 @@ class CartController extends Controller
         return response()->json($items);
     }
 
-    public function clearCart($person_id) {
+    public function clearCart($person_id)
+    {
         $cart = StoreShoppingCart::where('person_id', $person_id)->first();
 
         if (!$cart) {
@@ -342,39 +373,40 @@ class CartController extends Controller
         return response()->json(['message' => 'Cart cleared successfully']);
     }
 
-    public function allCarts() {
+    public function allCarts()
+    {
         $carts = StoreShoppingCart::with('items')->get();
         return response()->json($carts);
     }
 
     public function obtenerCarrito($usuarioId)
-{
-    $carrito = StoreShoppingCart::where('person_id', $usuarioId)->first();
+    {
+        $carrito = StoreShoppingCart::where('person_id', $usuarioId)->first();
 
-    if (!$carrito) {
-        return response()->json(['error' => 'Carrito no encontrado'], 404);
+        if (!$carrito) {
+            return response()->json(['error' => 'Carrito no encontrado'], 404);
+        }
+
+        return response()->json(['data' => $carrito], 200);
     }
 
-    return response()->json(['data' => $carrito], 200);
-}
+    public function validarCarrito($person_id)
+    {
+        $carrito = StoreShoppingCart::where('person_id', $person_id)->first();
 
-public function validarCarrito($person_id)
-{
-    $carrito = StoreShoppingCart::where('person_id', $person_id)->first();
+        if (!$carrito) {
+            return response()->json([
+                'existe' => false,
+                'mensaje' => 'Carrito no encontrado'
+            ], 404);
+        }
 
-    if (!$carrito) {
         return response()->json([
-            'existe' => false,
-            'mensaje' => 'Carrito no encontrado'
-        ], 404);
+            'existe' => true,
+            'mensaje' => 'Carrito encontrado',
+            'carrito' => $carrito
+        ], 200);
     }
-
-    return response()->json([
-        'existe' => true,
-        'mensaje' => 'Carrito encontrado',
-        'carrito' => $carrito
-    ], 200);
-}
 
 
 }

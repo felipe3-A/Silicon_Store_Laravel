@@ -81,7 +81,12 @@ class Login extends Controller
                     'message' => 'Inicio de sesión exitoso',
                     'cart_message' => $cartMessage,
                     'user' => $user,
-                    'token' => $token
+                    'token' => JWTAuth::customClaims([
+                        'sub' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role
+                    ])->fromUser($user)
                 ], 200);
             }
 
@@ -115,39 +120,36 @@ class Login extends Controller
      * Método para cerrar sesión.
      */
     public function logout(Request $request)
-    {
-        try {
-            // Obtener el token desde el header
-            $token = JWTAuth::getToken();
+{
+    try {
+        // Invalida el token actual desde el header Authorization
+        JWTAuth::parseToken()->invalidate();
 
-            if (!$token) {
-                return response()->json([
-                    'message' => 'Token no proporcionado'
-                ], 400);
-            }
+        \Log::info('Token JWT invalidado correctamente');
 
-            // Invalidar el token actual
-            JWTAuth::invalidate($token);
-
-            \Log::info('Token JWT invalidado correctamente');
-
-            return response()->json([
-                'message' => 'Sesión cerrada correctamente'
-            ]);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            \Log::error('Token inválido al cerrar sesión', ['error' => $e->getMessage()]);
-            return response()->json([
-                'message' => 'El token ya es inválido o expiró',
-                'error' => $e->getMessage()
-            ], 401);
-        } catch (\Exception $e) {
-            \Log::error('Error al cerrar sesión', ['error' => $e->getMessage()]);
-            return response()->json([
-                'message' => 'Error al cerrar sesión',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Sesión cerrada correctamente'
+        ]);
+    } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+        \Log::error('Token inválido al cerrar sesión', ['error' => $e->getMessage()]);
+        return response()->json([
+            'message' => 'El token ya es inválido o expiró',
+            'error' => $e->getMessage()
+        ], 401);
+    } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        \Log::error('Token no proporcionado o inválido', ['error' => $e->getMessage()]);
+        return response()->json([
+            'message' => 'No se pudo cerrar sesión. Token faltante o inválido.',
+            'error' => $e->getMessage()
+        ], 400);
+    } catch (\Exception $e) {
+        \Log::error('Error al cerrar sesión', ['error' => $e->getMessage()]);
+        return response()->json([
+            'message' => 'Error al cerrar sesión',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
 
 }

@@ -1,67 +1,200 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🛍️ Silicon Store
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Silicon Store** es una plataforma de comercio electrónico compuesta por dos proyectos principales:
 
-## About Laravel
+- **Frontend**: Aplicación web desarrollada con Angular.
+- **Backend**: API RESTful desarrollada con Laravel.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 📁 Repositorios del proyecto
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Frontend (Angular)**: [Silicon_store_Fronted](https://github.com/felipe3-A/Silicon_store_Fronted.git)
+- **Backend (Laravel)**: [Silicon_Store_Laravel](https://github.com/felipe3-A/Silicon_Store_Laravel.git)
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🚀 Tecnologías utilizadas
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### Frontend
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Framework**: Angular
+- **Lenguaje principal**: TypeScript
+- **Estilos**: CSS / SCSS
+- **Gestor de paquetes**: npm
+- **Herramientas de desarrollo**:
+  - Webpack
+  - Karma (pruebas unitarias)
+  - Protractor (pruebas end-to-end)
+- **Configuraciones destacadas**:
+  - `angular.json`
+  - `tsconfig.json`
+  - `karma.conf.js`
+  - `protractor.conf.js`
+  - `webpack.config.js`
+  - `proxy.conf.json`
+  - `genezio.yaml`
 
-## Laravel Sponsors
+### Backend
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- **Framework**: Laravel
+- **Lenguaje principal**: PHP
+- **Base de datos**: MySQL
+- **Gestor de dependencias**: Composer
+- **Herramientas de desarrollo**:
+  - PHPUnit (pruebas)
+  - Vite (gestión de assets)
+  - Tailwind CSS (estilos)
+- **Configuraciones destacadas**:
+  - `.env`
+  - `composer.json`
+  - `phpunit.xml`
+  - `vite.config.js`
+  - `tailwind.config.js`
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
-- **[Guia de Aualización](UPDATES.md)**
+## 📂 Estructura del proyecto
 
-## Contributing
+### Frontend
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```
+Silicon_store_Fronted/
+├── src/                   # Código fuente de Angular
+├── e2e/                   # Pruebas end-to-end
+├── angular.json           # Configuración principal de Angular
+├── tsconfig.json          # Configuración de TypeScript
+├── karma.conf.js          # Configuración de pruebas unitarias
+├── protractor.conf.js     # Configuración de pruebas E2E
+├── webpack.config.js      # Configuración de Webpack
+└── proxy.conf.json        # Proxy para peticiones HTTP
+```
 
-## Code of Conduct
+### Backend
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```
+Silicon_Store_Laravel/
+├── app/                   # Lógica principal de la aplicación
+├── routes/                # Definición de rutas web y API
+├── database/              # Migraciones y semillas
+├── config/                # Archivos de configuración
+├── resources/             # Vistas y archivos estáticos
+├── tests/                 # Pruebas con PHPUnit
+├── .env                   # Variables de entorno
+├── composer.json          # Dependencias PHP
+└── vite.config.js         # Configuración de Vite y Tailwind
+```
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## ⚙️ Instalación y ejecución
 
-## License
+### 🖥️ Frontend
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+1. Clonar el repositorio:
+
+```bash
+git clone https://github.com/felipe3-A/Silicon_store_Fronted.git
+cd Silicon_store_Fronted
+```
+
+2. Instalar dependencias:
+
+```bash
+npm install
+```
+
+3. Ejecutar en modo desarrollo:
+
+```bash
+ng serve
+```
+
+---
+
+### 🖥️ Backend
+
+1. Clonar el repositorio:
+
+```bash
+git clone https://github.com/felipe3-A/Silicon_Store_Laravel.git
+cd Silicon_Store_Laravel
+```
+
+2. Instalar dependencias:
+
+```bash
+composer install
+```
+
+3. Crear el archivo de entorno:
+
+```bash
+cp .env.example .env
+```
+
+4. Generar la clave de la aplicación:
+
+```bash
+php artisan key:generate
+```
+
+5. Configurar la base de datos y ejecutar migraciones:
+
+```bash
+php artisan migrate
+```
+
+6. Ejecutar el servidor de desarrollo:
+
+```bash
+php artisan serve
+```
+
+Accede a la API desde: [http://localhost:8000](http://localhost:8000)
+
+---
+
+## 🧪 Pruebas
+
+### Frontend
+
+- Ejecutar pruebas unitarias:
+
+```bash
+ng test
+```
+
+- Ejecutar pruebas end-to-end:
+
+```bash
+ng e2e
+```
+
+### Backend
+
+- Ejecutar pruebas:
+
+```bash
+php artisan test
+```
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Consulta el archivo `LICENSE.md` para más detalles.
+
+---
+
+## 👤 Autor
+
+**Felipe3-A**  
+GitHub: [https://github.com/felipe3-A](https://github.com/felipe3-A)
+
+---
+
+## ✅ Estado del proyecto
+
+Proyecto en desarrollo activo.  
+Se planean nuevas funcionalidades, mejoras en la interfaz, integración de pasarelas de pago y optimización del rendimiento general.
